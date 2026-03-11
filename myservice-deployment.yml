@@ -13,7 +13,7 @@ spec:
         app: myservice
     spec:
       containers:
-        - image: sanabns/myservice:1
+        - image: sanabns/myservice:v2
           imagePullPolicy: IfNotPresent
           name: myservice
           ports:

@@ -345,13 +345,15 @@ This will restore the Deployment to its last working version automatically, agai
 
 ## Create a deployment and a service using a yaml file
 
-Yaml files can be used instead of using the command `kubectl create deployment` and `kubectl expose deployment`
+Yaml files can be used instead of using the command `kubectl create deployment` and `kubectl expose deployment`. This approach is versionable and easier to manage in production.
 
-The yaml file for the deployment: https://github.com/charroux/kubernetes-minikube/blob/main/myservice-deployment.yml
+The required YAML files are located in the root of the project folder:
 
-The yaml file for the node port service: https://github.com/charroux/kubernetes-minikube/blob/main/myservice-service.yml
+* myservice-deployment.yml → defines the Deployment for the application
 
-The yaml file for the node port service: https://github.com/charroux/kubernetes-minikube/blob/main/myservice-loadbalancing-service.yml
+* myservice-service.yml → defines a NodePort Service to expose the Deployment
+
+* myservice-loadbalancing-service.yml → defines a LoadBalancer Service to expose the Deployment
 
 Apply the deployment:
 ```
