@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: myservice
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: myservice
@@ -13,7 +13,9 @@ spec:
         app: myservice
     spec:
       containers:
-        - image: efrei/myservice:1
+        - image: sanabns/myservice:1
           imagePullPolicy: IfNotPresent
           name: myservice
+          ports:
+            - containerPort: 8080
       restartPolicy: Always
