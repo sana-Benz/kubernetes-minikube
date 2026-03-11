@@ -375,10 +375,9 @@ Then test if it works as expected.
 
 # Routing rule to a service using Ingress
 
-You can use Ingress to expose your Service. 
-Ingress is not a Service type, but it acts as the entry point for your cluster. 
+An Ingress in Kubernetes is a resource that allows you to expose your services to the outside world through a single entry point.
+It is not a Service type, but acts like a reverse proxy that routes incoming HTTP/HTTPS requests to the appropriate Services in your cluster.
 It lets you consolidate your routing rules into a single resource as it can expose multiple services under the same IP address.
-Ingress exposes HTTP and HTTPS routes from outside the cluster to services within the cluster. 
 An Ingress may be configured to give Services externally-reachable URLs, load balance traffic, terminate SSL / TLS, and offer name-based virtual hosting.
 
 ## Set up Ingress on Minikube with the NGINX Ingress Controller
@@ -393,27 +392,35 @@ Verify that the NGINX Ingress controller is running:
 kubectl get pods -n ingress-nginx
 ```
 
-Create a Deployment and expose it as a NodePort (not a loadbalancer).
+Make sure you have a Deployment running and exposed as a NodePort (not LoadBalancer).
+Test that your service works before configuring Ingress.
 
-Check if it works.
-
-A yaml file for ingress: https://github.com/charroux/kubernetes-minikube/blob/main/ingress.yml
+A yaml file for ingress is located in the root of the project folder.
 
 ```
 kubectl apply -f ingress.yml
 ```
 
-Retrieve the IP address of Ingress: 
+Check the Ingress resource:
 
 ```
 kubectl get ingress
 ```
+Example output 
 
 ```
 NAME                 CLASS    HOSTS                  ADDRESS        PORTS   AGE
 
 example-ingress      nginx   myservice.info         192.168.64.2   80      18m
 ```
+* HOSTS: the domain name configured in Ingress (myservice.info)
+
+* PORTS: the port used (HTTP 80)
+
+* ADDRESS: may be empty in Minikube; you’ll use minikube ip instead
+
+### Configure Your Hosts File
+To access the service from your browser using the hostname:
 
 On Linux: edit the `/etc/hosts` file and add at the bottom values for: 
 
@@ -429,16 +436,16 @@ On Mac: edit the `/etc/hosts` file and add at the bottom values for:
 127.0.0.1 myservice.info
 
 
-Then check in your Web browser: 
-
-http://myservice.info/
-
 On Windows : edit the `c:\windows\system32\drivers\etc\hosts` file, add 
 
 `127.0.0.1 myservice.info`	
 
-Enable a tunnel for Minikube:
+Then check in your Web browser: 
 
+http://myservice.info/
+
+### Enable a tunnel for Minikube:
+For better host resolution and LoadBalancer support in Minikube:
 ```
 minikube addons enable ingress-dns
 ```
@@ -446,19 +453,45 @@ minikube addons enable ingress-dns
 minikube tunnel
 ```
 
-Then check in your Web browser: 
+The tunnel maps LoadBalancer and Ingress IPs to your local machine.
 
-http://myservice.info/
+After this, http://myservice.info/ should work consistently.
 
+### Add a second deployment and service:
 
-Create a second deployment and its service, then add a new route to the ingress.yml file.
+If you want to route multiple applications through the same Ingress, you can create a second deployment and its service.
+
+In this project, we created a second deployment with a NodePort service using these files:
+
+* myservice2-deployment.yml
+
+* myservice2-service.yml
+
+Then, add a new path to the ingress.yml file to route traffic to the second service:
+
+- path: /service2
+  pathType: Prefix
+  backend:
+    service:
+      name: myservice2
+      port:
+        number: 8080
+
+This allows requests to http://myservice.info/service2 to reach your second application.
 
 ## Delete resources
 
+To clean up your cluster, you can delete the services and deployments:
 ```
 kubectl delete services myservice
 ```
 ```
 kubectl delete deployment myservice
 ```
-
+You can also delete the second deployment/service if needed:
+```
+kubectl delete services myservice2
+```
+```
+kubectl delete deployment myservice2
+```
