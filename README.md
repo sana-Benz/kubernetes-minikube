@@ -2,6 +2,7 @@
 
 Minikube is a tool that lets you run Kubernetes locally. 
 minikube runs a single-node Kubernetes cluster on your personal computer (including Windows, macOS and Linux PCs) so that you can try out Kubernetes, or for daily development work.
+Minikube provides a kubernetes cluster composed of a single node that acts as both the control plane and the worker node at the same time.
 
 ## Docker installation
 
@@ -24,6 +25,12 @@ Minikube provides a dashboard (web portal). Access the dashboard using the follo
 ```
 minikube dashboard
 ```
+## Kubectl installation
+kubectl is a command-line tool used to control Kubernetes. It allows you to create deployments, start pods, expose services, scale applications, and perform updates.
+
+You can find the installation steps for kubectl for your operating system at the following link:
+https://kubernetes.io/docs/tasks/tools/
+
 
 ## Download this project
 
@@ -102,18 +109,26 @@ Example: `docker push myDockerID/myservice:1`
 
 ## Create a kubernetes deployment from a Docker image
 
+In this step, we deploy an application in Kubernetes using an existing Docker image hosted on Docker Hub.
+Kubernetes will automatically download the image, create a pod, and run the container inside the cluster.
+
+First, we verify that the Kubernetes cluster is running and that a node is available:
 ```
 kubectl get nodes
 ```
+Then, we create a deployment using a Docker image:
 ```
-kubectl create deployment myservice --image=efrei/myservice:1
+kubectl create deployment myservice --image=sanabns/myservice:1
 ```
+When this command is executed, Kubernetes will: 
+* pull the Docker image from Docker Hub
+* create a pod
+* run the container inside the pod
+* ensure the application keeps running
 
-The image used comes from the Docker hub: https://hub.docker.com/r/efrei/myservice/tags
+The image used comes from the Docker hub: https://hub.docker.com/r/sanabns/myservice . But you can use your own image instead.
 
-But you can use your own image instead.
-
-Check the pod:
+Check the pod that has been created :
 ```
 kubectl get pods
 ```
@@ -130,17 +145,17 @@ Retreive the IP address but notice that this IP address is ephemeral since a pod
 Then retrieve the deployment in the minikube dashboard. 
 Actually the Docker container is runnung inside a Kubernetes pods (look at the pod in the dashboard).
   
-You can also enter inside the container in a interactive mode with:
+You can also enter inside the container in a interactive mode. To open an interactive shell inside the container, run:
 ```
 kubectl exec -it podname -- /bin/bash
 ```
 
-where podname is the name of the pods obtained with:
+Replace podname with the name of the pod obtained using:
 ```
 kubectl get pods
 ```
 
-List the containt of the container with:
+Once inside the container, you can explore the filesystem. For example:
 ```
 ls
 ```
@@ -152,16 +167,25 @@ exit
 
 ## Expose the Deployment through a service
 
+In kubernetes, applications run inside pods. However, pods can be created, destroyed or replaced anytime. Because of this, the IP address of a pod is unstable and can change frequently.
+ 
+To provide a stable way to access a group of pods, kubernetes introduces the concept of a service.
+
 A Kubernetes Service is an abstraction which defines a logical set of Pods running somewhere in the cluster, 
 that all provide the same functionality. 
-When created, each Service is assigned a unique IP address (also called clusterIP). 
-This address is tied to the lifespan of the Service, and will not change while the Service is alive.
+When created, each Service is assigned a stable and unique IP address (also called clusterIP). 
+This IP address :
+* remains stable for the entire lifetime of a service
+* allows other components in the cluster to reliably communicate with the application
+* automatically load-balances requests across the Pods behind the Service.
+
+Even if Pods are recreated or replaced, the SErvice continues to route traffic to the new pods.
 
 ## Expose HTTP and HTTPS routes from outside the cluster to services within the cluster
 
-For some parts of your application (for example, frontends) you may want to expose a Service onto an external IP address, that’s outside of your cluster.
+By default, Services are only accessible inside the kubernetes cluster. However, some parts of your application (for example, frontends or web API) need to be accessible from outside the cluster.
 
-Kubernetes ServiceTypes allow you to specify what kind of Service you want. The default is ClusterIP.
+Kubernetes provides different Service types to control how the Service is exposed. The default one is ClusterIP.
 
 Type values and their behaviors are:
 
@@ -172,16 +196,27 @@ Type values and their behaviors are:
 
 ## Expose HTTP and HTTPS route using NodePort
 
+Run the following command to expose your Deployment using a NodePort Service :
+
 ```
 kubectl expose deployment myservice --type=NodePort --port=8080
 ```
+This command creates a Service that :
+* targets the Pods of the myservice Deployment
+* exposes port 8080
+* assigns a NodePort automatically
 
-Retrieve the service address:
+You can verify the service with :
+```
+kubectl get services
+```
+You can verify the ports in the output. For example, 8080 is the Service port and 30205 is the NodePort chosen randomly by kubernetes.
+
+Retrieve the service address with :
 ```
 minikube service myservice --url
 ```
-
-This format of this address is `NodeIP:NodePort`.
+This format of this address is `http://NodeIP:NodePort`. 
 
 Test this address inside your browser. It should display hello again.
 
@@ -189,78 +224,124 @@ Look from the NodeIP and the NodePort in the minikube dashboard.
 
 ## Scaling and load balancing
 
+One of the main advantages of kubernetes is the ability to scale applications easily and distribute traffic automatically between instances.
+
+In fact, we can run multiple replicas of the same application and kubernetes will ensure that they always stay running and automatically distribute incoming requests between them.
+
 Check if the myservice deployment is running:
 
 ```
 kubectl get deployments
 ```
+At this stage, the Deployment should have 1 replica.
 
-How many instance are actually running:
+To see the Pods created by the Deployment:
 
 ```
 kubectl get pods
 ```
+Here you should only see one Pod, which means that only one instance of the application is running.
 
+### Scale the application
+
+Now we will increase the number of application instances.
 Start a second instance:
 
 ```
 kubectl scale --replicas=2 deployment/myservice
 ```
+This command updates the Deployment configuration so that two replicas of the pod must be running.
+Kubernetes will automatically create a second pod to match the desired state.
+
+You can now check the deployment 
 ```
 kubectl get deployments
 ```
 
-and 
+and check the pods again
 
 ```
 kubectl get pods
 ```
 
-again
+You should now be able to see two pods running.
+In fact, if one Pod fails, kubernetes will automatically start a new one to maintain the desired number of replicas.
 
 ## Creating a Service of type LoadBalancer
 
-Check if the myservice deployment is running:
+In the previous section, the application was exposed using a NodePort Service. However, in real production environments, applications are usually exposed using a LoadBalancer Service.
+
+A LoadBalancer Service automatically creates an external load balancer that distributes incoming traffic to the application pods.
+
+Check if the myservice deployment is still running:
 
 ```
 kubectl get deployments
 ```
+Before creating a new Service of type LoadBalancer, we must ensure that there is no existing Service already exposing the Deployment.
 
-If a service is running in front of the deployment you must delete this service first in ordre to create a new one of kind LoadBalancer. So retreive the service using:
-
+List the services 
 ```
 kubectl get services
 ```
-And delete it:
+Since a service already exists for myservice, we must delete it.
+
 ```
 kubectl delete service serviceName
 ```
+This removes the previous NodePort Service. Note that deleting a Service does not affect the Pods or the Deployment. It only removes the network access configuration.
+
+Now create a new Service of type Load Balancer 
 ```
 kubectl expose deployment myservice --type=LoadBalancer --port=8080
 ```
+You can verify the newly created service with 
+```
+kubectl get services
+```
+You can retreive the new Service url with 
 ```
 minikube service myservice --url
 ```
-Test in your web browser
+Test in your web browser.
 
 ## Rolling updates
 
-Rolling updates allow Deployments' update to take place with zero downtime by incrementally updating Pods instances with new ones.
+When deploying applications in production, it is important to update applications without interrupting the service. Kubernetes provides a mechanism called Rolling Updates to acheive this.
 
-To update the image of the application to version 2, use the set image subcommand, followed by the deployment name and the new image version:
+A Rolling Update allows a Deployment to update its Pods gradually, replacing old verions of the application with new ones without downtime. 
+So, instead of stopping all running Pods and starting new ones, kubernetes :
+* Creates a new Pod with the updated version
+* Waits until the new Pod is ready 
+* Terminates one of the old Pods
+* Repeats the process until all Pods are updated
+
+This ensures that the application remains available during the update. At no point are all the Pods stopped simultaneously.
+
+
+### Update the application image
+For this part, we have created a new version (v2) of the Docker image on Docker Hub available here https://hub.docker.com/r/sanabns/myservice. We can now update the Deployment to use this new image.
+
+To update the image of the application to version 2, we use the set image subcommand, followed by the deployment name and the new image version  following this structure :
+
 ```
-kubectl set image deployments/my-deployment my-deployment=dockerHudId/my-image:v2
+kubectl set image deployment/DEPLOYMENT_NAME CONTAINER_NAME=IMAGE
+```
+
+```
+kubectl set image deployment/myservice myservice=dockerHubId/my-image:v2
 ```
 
 You can also confirm the update by running the rollout status subcommand:
 ```
-kubectl rollout status deployments/my-deployment
+kubectl rollout status deployments/myservice
 ```
 
 To roll back the deployment to your last working version, use the rollout undo subcommand:
 ```
-kubectl rollout undo deployments/my-deployment
+kubectl rollout undo deployments/myservice
 ```
+This will restore the Deployment to its last working version automatically, again with no downtime.
 
 ## Create a deployment and a service using a yaml file
 
